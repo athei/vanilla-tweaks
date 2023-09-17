@@ -26,6 +26,7 @@ The following patches are currently enabled by default:
 - Nameplate range change
 - Large address aware patch
 - Camera rotation skip glitch fix
+- Replace float opcode which is not supported under rosetta (safe to use for everyone)
 
 The following patches are disabled by default, and can be enabled with command line parameters:
 - Maximum camera distance limit increase")]
@@ -100,7 +101,11 @@ struct Args {
 
     /// If set, do not patch the fix for the camera sometimes skipping to a random direction when rotated.
     #[clap(long, default_value_t = false, value_parser)]
-    no_cameraskipfix: bool
+    no_cameraskipfix: bool,
+
+    /// If set, do not replace float opcode which is not supported under rosetta (can stay enabled even for windows/linux users)
+    #[clap(long, default_value_t = false, value_parser)]
+    no_rosettafix: bool,
 }
 
 /**
@@ -269,6 +274,18 @@ fn main() -> ExitCode {
         for (address, bytes) in patches.iter() {
             file[*address..*address+bytes.len()].copy_from_slice(&bytes);
         }
+        println!(" Success!");
+    }
+
+    // Fix rosetta.
+    // Changing opcode from (DC D8) to (D8 D8) which are equivalent.
+    // The former is unsupported under rosetta, though.
+    if !args.no_rosettafix {
+        const FCOMP_OFFSET: usize = 0x2fa876;
+        print!("Applying patch: rosetta fcomp...");
+        assert_eq!(file[FCOMP_OFFSET], 0xdc);
+        assert_eq!(file[FCOMP_OFFSET + 1], 0xd8);
+        file[FCOMP_OFFSET] = 0xd8;
         println!(" Success!");
     }
 
